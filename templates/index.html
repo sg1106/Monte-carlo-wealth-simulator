@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monte Carlo Wealth Simulator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --gold: #F5C842;
+            --gold2: #E8A020;
+            --green: #3DD68C;
+            --red: #FF5B5B;
+            --blue: #60A5FA;
+            --bg: #0D0F14;
+            --bg2: #131720;
+            --bg3: #1A1F2E;
+            --border: #252B3D;
+            --text: #E8ECF4;
+            --muted: #5C6478;
+            --accent: #7C8CFF;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: 100vh;
+            gap: 0;
+        }
+
+        .sidebar {
+            background: var(--bg2);
+            border-right: 1px solid var(--border);
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            overflow-y: auto;
+            position: sticky;
+            top: 0;
+            max-height: 100vh;
+        }
+
+        .logo {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--gold);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 6px;
+        }
+
+        .logo span {
+            color: var(--muted);
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 8px 0;
+        }
+
+        .param-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .param-label {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .param-label .val {
+            color: var(--gold);
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 3px;
+            appearance: none;
+            background: var(--border);
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--gold);
+            border: 2px solid var(--bg2);
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--gold);
+            border: 2px solid var(--bg2);
+            cursor: pointer;
+        }
+
+        input[type="number"],
+        input[type="text"],
+        select {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 12px;
+            padding: 7px 8px;
+            border-radius: 4px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="number"]:focus,
+        input[type="text"]:focus,
+        select:focus {
+            border-color: var(--gold);
+        }
+
+        .run-btn {
+            background: var(--gold);
+            color: var(--bg);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 12px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.15s;
+            margin-top: 8px;
+        }
+
+        .run-btn:hover:not(:disabled) {
+            background: var(--gold2);
+            transform: translateY(-1px);
+        }
+
+        .run-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .run-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            padding: 6px 0;
+            min-height: 16px;
+        }
+
+        .main {
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+        }
+
+        .title {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--gold);
+            margin-bottom: 8px;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px;
+        }
+
+        .metric {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px 14px;
+        }
+
+        .metric-label {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 9px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            margin-bottom: 6px;
+        }
+
+        .metric-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .metric-value.up { color: var(--green); }
+        .metric-value.dn { color: var(--red); }
+        .metric-value.gold { color: var(--gold); }
+
+        .metric-sub {
+            font-size: 10px;
+            color: var(--muted);
+            margin-top: 3px;
+        }
+
+        hr {
+            border: none;
+            height: 1px;
+            background: var(--border);
+            margin: 8px 0;
+        }
+
+        .chart-wrap {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            min-height: 380px;
+            flex: 1;
+        }
+
+        .section-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 8px;
+        }
+
+        .section {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px;
+        }
+
+        .section-title {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .prob-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .prob-label {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            width: 100px;
+            flex-shrink: 0;
+        }
+
+        .prob-track {
+            flex: 1;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .prob-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .prob-pct {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            font-weight: 600;
+            width: 40px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .dist-wrap {
+            position: relative;
+            height: 140px;
+        }
+
+        .footer {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 4px;
+        }
+
+        .footer-box {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 9px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .footer-box b {
+            color: var(--gold);
+            font-weight: 600;
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                max-height: auto;
+            }
+
+            .section-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo">Monte<span>//</span>Carlo <span>v2</span></div>
+
+            <div class="param-group">
+                <div class="param-label">Initial Capital <span class="val" id="lbl-cap">$10,000</span></div>
+                <input type="number" id="inp-cap" value="10000" min="1000" max="10000000" step="1000">
+            </div>
+
+            <div class="param-group">
+                <div class="param-label">Annual Contribution <span class="val" id="lbl-contrib">$0</span></div>
+                <input type="number" id="inp-contrib" value="0" min="0" max="500000" step="500">
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="param-group">
+                <div class="param-label">Annual Return <span class="val" id="lbl-mu">7.0%</span></div>
+                <input type="range" id="inp-mu" min="-10" max="25" value="7" step="0.5">
+            </div>
+
+            <div class="param-group">
+                <div class="param-label">Volatility σ <span class="val" id="lbl-sig">15.0%</span></div>
+                <input type="range" id="inp-sig" min="1" max="60" value="15" step="0.5">
+            </div>
+
+            <div class="param-group">
+                <div class="param-label">Inflation Rate <span class="val" id="lbl-inf">2.0%</span></div>
+                <input type="range" id="inp-inf" min="0" max="8" value="2" step="0.5">
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="param-group">
+                <div class="param-label">Time Horizon <span class="val" id="lbl-T">20 yrs</span></div>
+                <input type="range" id="inp-T" min="1" max="50" value="20" step="1">
+            </div>
+
+            <div class="param-group">
+                <div class="param-label">Simulations <span class="val" id="lbl-n">1,000</span></div>
+                <input type="range" id="inp-n" min="200" max="5000" value="1000" step="100">
+            </div>
+
+            <div class="param-group">
+                <div class="param-label">Steps/Year <span class="val" id="lbl-steps">12</span></div>
+                <select id="inp-steps">
+                    <option value="12">Monthly (12)</option>
+                    <option value="52">Weekly (52)</option>
+                    <option value="252">Daily (252)</option>
+                </select>
+            </div>
+
+            <div class="param-group">
+                <div class="param-label">Show Paths <span class="val" id="lbl-paths">100</span></div>
+                <input type="range" id="inp-paths" min="0" max="300" value="100" step="10">
+            </div>
+
+            <div class="param-group">
+                <div class="param-label">CI Lower <span class="val" id="lbl-cil">5%</span></div>
+                <input type="range" id="inp-cil" min="1" max="25" value="5" step="1">
+            </div>
+
+            <div class="param-group">
+                <div class="param-label">CI Upper <span class="val" id="lbl-ciu">95%</span></div>
+                <input type="range" id="inp-ciu" min="75" max="99" value="95" step="1">
+            </div>
+
+            <button class="run-btn" onclick="runSimulation()">▶  RUN SIMULATION</button>
+            <div class="status" id="status"></div>
+        </aside>
+
+        <main class="main">
+            <h1 class="title">Monte Carlo Wealth Simulator</h1>
+
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Median Final</div>
+                    <div class="metric-value gold" id="m-median">—</div>
+                    <div class="metric-sub">50th percentile</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Best Case</div>
+                    <div class="metric-value up" id="m-best">—</div>
+                    <div class="metric-sub">95th percentile</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Worst Case</div>
+                    <div class="metric-value dn" id="m-worst">—</div>
+                    <div class="metric-sub">5th percentile</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Mean Final</div>
+                    <div class="metric-value" id="m-mean">—</div>
+                    <div class="metric-sub">all paths</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Real Value</div>
+                    <div class="metric-value" id="m-real">—</div>
+                    <div class="metric-sub">inflation-adj.</div>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="chart-wrap">
+                <canvas id="mainChart" role="img" aria-label="Monte Carlo simulation showing portfolio wealth paths"></canvas>
+            </div>
+
+            <div class="section-grid">
+                <div class="section">
+                    <div class="section-title">Final Value Distribution</div>
+                    <div class="dist-wrap">
+                        <canvas id="distChart" role="img" aria-label="Distribution of final portfolio values"></canvas>
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="section-title">Reach Target Probability</div>
+                    <div id="prob-bars"></div>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="footer">
+                <div class="footer-box">
+                    <b>Model</b><br>
+                    Geometric Brownian Motion<br>
+                    <span id="footer-params"></span>
+                </div>
+                <div class="footer-box">
+                    <b>Percentiles (Final)</b><br>
+                    <span id="footer-pct"></span>
+                </div>
+                <div class="footer-box">
+                    <b style="color: var(--red);">Disclaimer</b><br>
+                    Simulation only. Past returns do not guarantee future results. Not financial advice.
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let mainChart = null, distChart = null;
+
+        function fmt(v) {
+            if (v >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
+            if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+            if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
+            return '$' + Math.round(v).toLocaleString();
+        }
+
+        function pct(v, d = 1) {
+            return v.toFixed(d) + '%';
+        }
+
+        function syncLabels() {
+            const cap = +document.getElementById('inp-cap').value;
+            const mu = +document.getElementById('inp-mu').value;
+            const sig = +document.getElementById('inp-sig').value;
+            const T = +document.getElementById('inp-T').value;
+            const n = +document.getElementById('inp-n').value;
+            const inf = +document.getElementById('inp-inf').value;
+            const contrib = +document.getElementById('inp-contrib').value;
+            const paths = +document.getElementById('inp-paths').value;
+            const steps = +document.getElementById('inp-steps').value;
+            const cil = +document.getElementById('inp-cil').value;
+            const ciu = +document.getElementById('inp-ciu').value;
+
+            document.getElementById('lbl-cap').textContent = fmt(cap);
+            document.getElementById('lbl-mu').textContent = pct(mu);
+            document.getElementById('lbl-sig').textContent = pct(sig);
+            document.getElementById('lbl-inf').textContent = pct(inf);
+            document.getElementById('lbl-T').textContent = T + ' yrs';
+            document.getElementById('lbl-n').textContent = n.toLocaleString();
+            document.getElementById('lbl-contrib').textContent = fmt(contrib);
+            document.getElementById('lbl-paths').textContent = paths;
+            document.getElementById('lbl-steps').textContent = steps;
+            document.getElementById('lbl-cil').textContent = cil + '%';
+            document.getElementById('lbl-ciu').textContent = ciu + '%';
+        }
+
+        ['inp-cap', 'inp-mu', 'inp-sig', 'inp-T', 'inp-n', 'inp-inf', 'inp-contrib', 'inp-paths', 'inp-steps', 'inp-cil', 'inp-ciu'].forEach(id => {
+            document.getElementById(id).addEventListener('input', syncLabels);
+        });
+
+        async function runSimulation() {
+            const btn = document.querySelector('.run-btn');
+            btn.disabled = true;
+            btn.textContent = '⟳ RUNNING...';
+            document.getElementById('status').textContent = '● Simulating...';
+
+            const params = {
+                initial_capital: +document.getElementById('inp-cap').value,
+                annual_contribution: +document.getElementById('inp-contrib').value,
+                annual_return: +document.getElementById('inp-mu').value,
+                volatility: +document.getElementById('inp-sig').value,
+                inflation: +document.getElementById('inp-inf').value,
+                time_horizon: +document.getElementById('inp-T').value,
+                n_simulations: +document.getElementById('inp-n').value,
+                steps_per_year: +document.getElementById('inp-steps').value,
+                show_paths: +document.getElementById('inp-paths').value,
+                ci_lower: +document.getElementById('inp-cil').value,
+                ci_upper: +document.getElementById('inp-ciu').value,
+            };
+
+            try {
+                const response = await fetch('/api/simulate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+
+                const data = await response.json();
+
+                if (!data.success) throw new Error(data.error);
+
+                updateMetrics(data.stats, params);
+                drawMainChart(data.chart, params);
+                drawDistChart(data.distribution, data.stats);
+                drawProbBars(data.stats.probs);
+                updateFooter(data.stats, params);
+
+                document.getElementById('status').textContent = '✓ Complete';
+            } catch (error) {
+                document.getElementById('status').textContent = '✗ Error: ' + error.message;
+            }
+
+            btn.disabled = false;
+            btn.textContent = '▶  RUN SIMULATION';
+        }
+
+        function updateMetrics(stats, params) {
+            document.getElementById('m-median').textContent = fmt(stats.p50);
+            document.getElementById('m-best').textContent = fmt(stats.p95);
+            document.getElementById('m-worst').textContent = fmt(stats.p5);
+            document.getElementById('m-mean').textContent = fmt(stats.mean);
+            document.getElementById('m-real').textContent = fmt(stats.real_median);
+        }
+
+        function drawMainChart(chartData, params) {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            const times = chartData.times;
+            const p50 = chartData.percentiles.p50;
+            const p25 = chartData.percentiles.p25;
+            const p75 = chartData.percentiles.p75;
+            const p5 = chartData.percentiles.p5;
+            const p95 = chartData.percentiles.p95;
+            const meanPath = chartData.mean_path;
+            const samplePaths = chartData.sample_paths;
+
+            const datasets = [];
+
+            samplePaths.forEach((path, i) => {
+                datasets.push({
+                    label: '',
+                    data: times.map((t, idx) => ({
+                        x: t,
+                        y: path[idx]
+                    })),
+                    borderColor: 'rgba(92, 100, 120, 0.12)',
+                    borderWidth: 0.8,
+                    pointRadius: 0,
+                    tension: 0.3,
+                    showLine: true,
+                });
+            });
+
+            datasets.push({
+                label: 'CI Band',
+                data: times.map((t, i) => ({ x: t, y: p95[i] })),
+                borderColor: 'rgba(0,0,0,0)',
+                backgroundColor: 'rgba(0,0,0,0)',
+                pointRadius: 0,
+                borderWidth: 0,
+            });
+
+            datasets.push({
+                label: '',
+                data: times.map((t, i) => ({ x: t, y: p5[i] })),
+                borderColor: 'rgba(0,0,0,0)',
+                backgroundColor: 'rgba(245, 200, 66, 0.08)',
+                fill: '-1',
+                pointRadius: 0,
+                borderWidth: 0,
+            });
+
+            datasets.push({
+                label: '',
+                data: times.map((t, i) => ({ x: t, y: p75[i] })),
+                borderColor: 'rgba(0,0,0,0)',
+                backgroundColor: 'rgba(0,0,0,0)',
+                pointRadius: 0,
+                borderWidth: 0,
+            });
+
+            datasets.push({
+                label: 'IQR',
+                data: times.map((t, i) => ({ x: t, y: p25[i] })),
+                borderColor: 'rgba(0,0,0,0)',
+                backgroundColor: 'rgba(245, 200, 66, 0.12)',
+                fill: '-1',
+                pointRadius: 0,
+                borderWidth: 0,
+            });
+
+            datasets.push({
+                label: 'Median',
+                data: times.map((t, i) => ({ x: t, y: p50[i] })),
+                borderColor: '#F5C842',
+                backgroundColor: 'rgba(0,0,0,0)',
+                borderWidth: 2.5,
+                pointRadius: 0,
+                tension: 0.3,
+            });
+
+            datasets.push({
+                label: 'Mean',
+                data: times.map((t, i) => ({ x: t, y: meanPath[i] })),
+                borderColor: '#60A5FA',
+                backgroundColor: 'rgba(0,0,0,0)',
+                borderWidth: 1.5,
+                pointRadius: 0,
+                borderDash: [6, 3],
+                tension: 0.3,
+            });
+
+            if (mainChart) mainChart.destroy();
+            mainChart = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 800 },
+                    parsing: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: 0,
+                            max: params.time_horizon,
+                            title: { display: true, text: 'Years', color: '#5C6478', font: { size: 10 } },
+                            ticks: { color: '#5C6478', font: { size: 9 }, maxTicksLimit: 11 },
+                            grid: { color: 'rgba(37, 43, 61, 0.8)' },
+                        },
+                        y: {
+                            title: { display: true, text: 'Portfolio Value ($)', color: '#5C6478', font: { size: 10 } },
+                            ticks: {
+                                color: '#5C6478',
+                                font: { size: 9 },
+                                callback: v => fmt(v)
+                            },
+                            grid: { color: 'rgba(37, 43, 61, 0.8)' },
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { color: '#E8ECF4', font: { size: 10 }, filter: item => !!item.label && item.label.length > 0 }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: '#131720',
+                            borderColor: '#252B3D',
+                            borderWidth: 1,
+                            titleColor: '#F5C842',
+                            bodyColor: '#E8ECF4',
+                            titleFont: { family: "'IBM Plex Mono'", size: 10 },
+                            bodyFont: { family: "'IBM Plex Mono'", size: 9 },
+                            callbacks: {
+                                title: items => 'Year ' + items[0].parsed.x.toFixed(1),
+                                label: item => {
+                                    if (!item.dataset.label || item.dataset.label === '') return null;
+                                    return ' ' + item.dataset.label + ': ' + fmt(item.parsed.y);
+                                },
+                                filter: item => !!item.dataset.label && item.dataset.label !== ''
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawDistChart(distribution, stats) {
+            const ctx = document.getElementById('distChart').getContext('2d');
+            const bins = distribution.bins;
+            const counts = distribution.counts;
+            const colors = bins.map(b => {
+                if (b < stats.p5) return 'rgba(255, 91, 91, 0.7)';
+                if (b > stats.p95) return 'rgba(61, 214, 140, 0.7)';
+                return 'rgba(245, 200, 66, 0.65)';
+            });
+
+            if (distChart) distChart.destroy();
+            distChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: bins.map(b => fmt(b)),
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: colors,
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 600 },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    }
+                }
+            });
+        }
+
+        function drawProbBars(probs) {
+            const html = Object.entries(probs).map(([k, p]) => {
+                const color = p >= 60 ? '#3DD68C' : (p >= 30 ? '#F5C842' : '#FF5B5B');
+                return `
+                    <div class="prob-row">
+                        <div class="prob-label">${k}</div>
+                        <div class="prob-track">
+                            <div class="prob-fill" style="width: ${p.toFixed(1)}%; background: ${color};"></div>
+                        </div>
+                        <div class="prob-pct" style="color: ${color};">${p.toFixed(0)}%</div>
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('prob-bars').innerHTML = html;
+        }
+
+        function updateFooter(stats, params) {
+            const paramsText = `μ=${params.annual_return.toFixed(1)}% · σ=${params.volatility.toFixed(1)}% · T=${params.time_horizon}yr<br>${params.n_simulations.toLocaleString()} paths`;
+            const pctText = `P${params.ci_lower}: ${fmt(stats.p5)}<br>P50: ${fmt(stats.p50)}<br>P${params.ci_upper}: ${fmt(stats.p95)}`;
+            document.getElementById('footer-params').innerHTML = paramsText;
+            document.getElementById('footer-pct').innerHTML = pctText;
+        }
+
+        syncLabels();
+        runSimulation();
+    </script>
+</body>
+</html>
